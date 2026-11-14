@@ -3,9 +3,6 @@
 A small desktop app that installs the BIOS files **you already own** onto a
 [Batocera](https://batocera.org) device over your home network. It works on Linux, macOS and Windows.
 
-Cartridge does **not** download or include any BIOS files. They are copyrighted, so you need to
-dump them from consoles you own and put them in a folder on your computer.
-
 ## How it works (step by step)
 
 1. **Connect** - enter your Batocera's IP address (Batocera: Main menu > Network Settings). The defaults are
