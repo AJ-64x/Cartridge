@@ -3,6 +3,8 @@
 A small desktop app that installs the BIOS files **you already own** onto a
 [Batocera](https://batocera.org) device over your home network. It runs on **Windows and Linux**.
 
+## BIOS Files downloadable [Here](https://https://abdess.github.io/retrobios/get/batocera/)
+
 <p align="center"><img src="docs/2-pick.png" alt="Cartridge choosing a BIOS folder" width="560"></p>
 
 ## How it works
