@@ -14,9 +14,6 @@ jobs:
           - os: ubuntu-latest
             name: linux
             bin: cartridge
-          - os: macos-latest
-            name: macos
-            bin: cartridge
           - os: windows-latest
             name: windows
             bin: cartridge.exe
