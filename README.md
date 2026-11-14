@@ -1,4 +1,4 @@
-# Cartridge
+<p align="center"><img src="docs/banner.png" alt="Cartridge: install the BIOS files you own onto Batocera"></p>
 
 A small desktop app that installs the BIOS files **you already own** onto a
 [Batocera](https://batocera.org) device over your home network. It runs on **Windows and Linux**.
@@ -42,10 +42,24 @@ All BIOS files go in `/userdata/bios/`. You can also reach that folder through t
 `\\BATOCERA\share\bios` (Windows) or `smb://batocera/share/bios` (Linux). The current list for your version
 is in EmulationStation under *System Settings > Missing BIOS*, or by running `batocera-systems` over SSH.
 
-## Download
+## Download and install
 
-Builds for Windows and Linux are made by GitHub Actions: open the **Actions** tab, pick the latest successful
-run and download the file for your system. Tagging a version like `v0.1.0` also publishes a release.
+Get the latest version from the [**Releases**](../../releases/latest) page.
+
+**Windows:** download `cartridge-windows.zip`, unzip it and run `cartridge.exe`. (Windows may show a SmartScreen
+warning because the app isn't code-signed: click *More info > Run anyway*.)
+
+**Linux:** download `cartridge-linux.zip`, unzip it and run the installer:
+
+```
+./install-linux.sh
+```
+
+That puts Cartridge in your app menu with its icon. Search for "Cartridge" (log out and back in once if it
+doesn't appear right away). To remove it: `./install-linux.sh --uninstall`. You can also just run `./cartridge`
+without installing.
+
+Releases are built by GitHub Actions. Pushing a tag like `v0.1.2` builds and publishes a new one.
 
 ## Build it yourself
 

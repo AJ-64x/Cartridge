@@ -13,10 +13,10 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux
-            bin: cartridge
+            path: pkg
           - os: windows-latest
             name: windows
-            bin: cartridge.exe
+            path: target/release/cartridge.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +25,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
       - run: cargo build --release
+      - name: Package Linux (app + menu entry + installer)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir pkg
+          cp target/release/cartridge pkg/
+          cp linux/cartridge.desktop linux/cartridge.png linux/install-linux.sh pkg/
+          chmod +x pkg/cartridge pkg/install-linux.sh
       - uses: actions/upload-artifact@v4
         with:
           name: cartridge-${{ matrix.name }}
-          path: target/release/${{ matrix.bin }}
+          path: ${{ matrix.path }}
 
   release:
     if: startsWith(github.ref, 'refs/tags/')

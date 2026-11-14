@@ -11,6 +11,9 @@ ssh2 = { version = "0.9", features = ["vendored-openssl"] } # SSH + SFTP, OpenSS
 md-5 = "0.10"                                            # MD5 checksums
 walkdir = "2"                                            # scan folders
 
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"                                      # puts the icon inside cartridge.exe
+
 [profile.release]
 opt-level = "s"
 lto = true

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cartridge
+GenericName=BIOS installer for Batocera
+Comment=Install the BIOS files you own onto a Batocera device
+Exec=cartridge
+Icon=cartridge
+Terminal=false
+Categories=Utility;Game;
+Keywords=batocera;bios;emulation;retro;
+StartupWMClass=cartridge

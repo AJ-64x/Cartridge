@@ -776,7 +776,15 @@ impl eframe::App for App {
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([760.0, 660.0]).with_min_inner_size([640.0, 560.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([760.0, 660.0])
+            .with_min_inner_size([640.0, 560.0])
+            .with_app_id("cartridge") // lets Linux match the window to cartridge.desktop
+            .with_icon(egui::IconData {
+                rgba: include_bytes!("../assets/icon_256.rgba").to_vec(),
+                width: 256,
+                height: 256,
+            }),
         ..Default::default()
     };
     eframe::run_native(
