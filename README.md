@@ -55,6 +55,8 @@ warning because the app isn't code-signed: click *More info > Run anyway*.)
 ./install-linux.sh
 ```
 
+(If your system says it isn't executable, run `sh install-linux.sh` instead.)
+
 That puts Cartridge in your app menu with its icon. Search for "Cartridge" (log out and back in once if it
 doesn't appear right away). To remove it: `./install-linux.sh --uninstall`. You can also just run `./cartridge`
 without installing.

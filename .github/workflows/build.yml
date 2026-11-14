@@ -48,6 +48,8 @@ jobs:
         with:
           path: dist
       - run: |
+          # artifact upload/download drops the executable bit, so put it back before zipping
+          chmod +x dist/cartridge-linux/cartridge dist/cartridge-linux/install-linux.sh
           cd dist
           for d in cartridge-*; do (cd "$d" && zip -r "../$d.zip" .); done
       - uses: softprops/action-gh-release@v2
