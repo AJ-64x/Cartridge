@@ -1,0 +1,17 @@
+[package]
+name = "cartridge"
+version = "0.1.0"
+edition = "2021"
+description = "Install the BIOS files you own onto a Batocera device, step by step"
+
+[dependencies]
+eframe = "0.27"                                          # the desktop window (egui)
+rfd = "0.14"                                             # native "choose folder" dialog
+ssh2 = { version = "0.9", features = ["vendored-openssl"] } # SSH + SFTP, OpenSSL built in
+md-5 = "0.10"                                            # MD5 checksums
+walkdir = "2"                                            # scan folders
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

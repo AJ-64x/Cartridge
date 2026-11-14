@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            bin: cartridge
+          - os: macos-latest
+            name: macos
+            bin: cartridge
+          - os: windows-latest
+            name: windows
+            bin: cartridge.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+      - run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cartridge-${{ matrix.name }}
+          path: target/release/${{ matrix.bin }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - run: |
+          cd dist
+          for d in cartridge-*; do (cd "$d" && zip -r "../$d.zip" .); done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
