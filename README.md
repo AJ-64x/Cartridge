@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.png" alt="Cartridge: install the BIOS files you own onto Batocera"></p>
+<p align="center"><img src="docs/banner.png" alt="Cartridge"></p>
 
 A small desktop app that installs the BIOS files **you already own** onto a
 [Batocera](https://batocera.org) device over your home network. It runs on **Windows and Linux**.
