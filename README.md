@@ -46,3 +46,7 @@ cargo run --release
 - SSH must be enabled on Batocera (it is by default).
 - Your password is only sent to the Batocera device you enter.
 - Wrong-version files are never overwritten unless a file with the correct MD5 is found.
+
+## Credits
+
+Created by AJ-64x with code written by [Claude](https://claude.ai) (Anthropic).
