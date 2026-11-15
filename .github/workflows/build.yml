@@ -11,31 +11,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            name: linux
-            path: pkg
-          - os: windows-latest
-            name: windows
-            path: target/release/cartridge.exe
+          # x86_64 = Intel / AMD 64-bit PCs, aarch64 = ARM 64-bit (Snapdragon laptops, Raspberry Pi, ...)
+          - { os: ubuntu-latest,   name: linux-x86_64,    kind: linux }
+          - { os: ubuntu-24.04-arm, name: linux-aarch64,  kind: linux }
+          - { os: windows-latest,  name: windows-x86_64,  kind: windows }
+          - { os: windows-11-arm,  name: windows-aarch64, kind: windows }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.kind == 'linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
       - run: cargo build --release
+
       - name: Package Linux (app + menu entry + installer)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.kind == 'linux'
         run: |
           mkdir pkg
           cp target/release/cartridge pkg/
           cp linux/cartridge.desktop linux/cartridge.png linux/install-linux.sh pkg/
           chmod +x pkg/cartridge pkg/install-linux.sh
-      - uses: actions/upload-artifact@v4
+          cd pkg && zip ../cartridge-${{ matrix.name }}.zip *
+      - name: Upload Linux zip
+        if: matrix.kind == 'linux'
+        uses: actions/upload-artifact@v4
         with:
           name: cartridge-${{ matrix.name }}
-          path: ${{ matrix.path }}
+          path: cartridge-${{ matrix.name }}.zip
+
+      - name: Name the Windows exe
+        if: matrix.kind == 'windows'
+        run: Move-Item target/release/cartridge.exe cartridge-${{ matrix.name }}.exe
+      - name: Upload Windows exe
+        if: matrix.kind == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartridge-${{ matrix.name }}
+          path: cartridge-${{ matrix.name }}.exe
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -47,11 +60,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-      - run: |
-          # artifact upload/download drops the executable bit, so put it back before zipping
-          chmod +x dist/cartridge-linux/cartridge dist/cartridge-linux/install-linux.sh
-          cd dist
-          for d in cartridge-*; do (cd "$d" && zip -r "../$d.zip" .); done
+          merge-multiple: true
+      - run: ls -la dist
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/*

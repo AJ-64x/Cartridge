@@ -321,11 +321,34 @@ fn stat(ui: &mut Ui, n: usize, label: &str, color: Color32) {
 }
 
 fn logo(ui: &mut Ui) {
-    let (rect, _) = ui.allocate_exact_size(vec2(26.0, 32.0), egui::Sense::hover());
+    // A game cartridge on a 28 x 32 grid (same design as the app icon).
+    let (rect, _) = ui.allocate_exact_size(vec2(28.0, 32.0), egui::Sense::hover());
     let p = ui.painter();
-    p.rect_filled(rect, 5.0, ACCENT);
-    p.rect_filled(egui::Rect::from_min_size(rect.min + vec2(5.0, 4.0), vec2(16.0, 12.0)), 2.0, Color32::from_rgb(20, 20, 24));
-    p.rect_filled(egui::Rect::from_min_size(rect.min + vec2(7.0, 22.0), vec2(12.0, 5.0)), 1.5, Color32::from_rgb(20, 20, 24));
+    let o = rect.min;
+    let pt = |x: f32, y: f32| o + vec2(x, y);
+    let r = |x0: f32, y0: f32, x1: f32, y1: f32, round: f32, c: Color32| {
+        p.rect_filled(egui::Rect::from_min_max(pt(x0, y0), pt(x1, y1)), round, c);
+    };
+    let deep = Color32::from_rgb(196, 98, 36);
+    let dark = Color32::from_rgb(20, 20, 24);
+    let cream = Color32::from_rgb(244, 236, 220);
+    let mute = Color32::from_rgb(150, 140, 125);
+    p.add(egui::Shape::convex_polygon(
+        vec![pt(0.0, 5.0), pt(5.0, 0.0), pt(23.0, 0.0), pt(28.0, 5.0), pt(28.0, 27.0), pt(0.0, 27.0)],
+        ACCENT,
+        Stroke::NONE,
+    ));
+    r(8.0, 2.4, 20.0, 3.4, 0.5, deep); // grip ridges
+    r(8.0, 4.4, 20.0, 5.4, 0.5, deep);
+    r(4.0, 8.0, 24.0, 22.0, 1.5, cream); // label
+    r(7.0, 11.5, 21.0, 14.5, 0.8, deep);
+    r(7.0, 16.5, 17.0, 18.0, 0.6, mute);
+    r(7.0, 19.0, 13.0, 20.3, 0.6, mute);
+    r(4.0, 27.0, 24.0, 32.0, 0.8, deep); // connector
+    for i in 0..7 {
+        let x = 6.4 + 2.4 * i as f32;
+        r(x, 28.3, x + 1.2, 31.2, 0.2, dark); // pins
+    }
 }
 
 fn stepper(ui: &mut Ui, cur: usize) {

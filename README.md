@@ -44,24 +44,30 @@ is in EmulationStation under *System Settings > Missing BIOS*, or by running `ba
 
 ## Download and install
 
-Get the latest version from the [**Releases**](../../releases/latest) page.
+Get the latest version from the [**Releases**](../../releases/latest) page and pick the file for your computer:
 
-**Windows:** download `cartridge-windows.zip`, unzip it and run `cartridge.exe`. (Windows may show a SmartScreen
-warning because the app isn't code-signed: click *More info > Run anyway*.)
+| Your computer | Windows | Linux |
+|---|---|---|
+| **Intel / AMD** (most PCs, called x86_64 or "x64") | `cartridge-windows-x86_64.exe` | `cartridge-linux-x86_64.zip` |
+| **ARM** (aarch64 / arm64, e.g. Snapdragon laptops, Raspberry Pi) | `cartridge-windows-aarch64.exe` | `cartridge-linux-aarch64.zip` |
 
-**Linux:** download `cartridge-linux.zip`, unzip it and run the installer:
+Not sure? On Windows check *Settings > System > About > System type*. On Linux run `uname -m`
+(`x86_64` = Intel/AMD, `aarch64` = ARM).
+
+**Windows:** just download the `.exe` and double-click it. No install or unzip needed. (Windows may show a
+SmartScreen warning because the app isn't code-signed: click *More info > Run anyway*.)
+
+**Linux:** unzip the file and run the installer:
 
 ```
 ./install-linux.sh
 ```
 
-(If your system says it isn't executable, run `sh install-linux.sh` instead.)
-
 That puts Cartridge in your app menu with its icon. Search for "Cartridge" (log out and back in once if it
 doesn't appear right away). To remove it: `./install-linux.sh --uninstall`. You can also just run `./cartridge`
-without installing.
+without installing. (If your system says the script isn't executable, run `sh install-linux.sh` instead.)
 
-Releases are built by GitHub Actions. Pushing a tag like `v0.1.2` builds and publishes a new one.
+Releases are built by GitHub Actions. Pushing a tag like `v0.2.1` builds and publishes a new one.
 
 ## Build it yourself
 
