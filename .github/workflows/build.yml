@@ -32,13 +32,16 @@ jobs:
           cp target/release/cartridge pkg/
           cp linux/cartridge.desktop linux/cartridge.png linux/install-linux.sh pkg/
           chmod +x pkg/cartridge pkg/install-linux.sh
-          cd pkg && zip ../cartridge-${{ matrix.name }}.zip *
-      - name: Upload Linux zip
+          (cd pkg && zip ../cartridge-${{ matrix.name }}.zip *)
+          cp target/release/cartridge cartridge-${{ matrix.name }}   # raw binary
+      - name: Upload Linux files (zip + raw binary)
         if: matrix.kind == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: cartridge-${{ matrix.name }}
-          path: cartridge-${{ matrix.name }}.zip
+          path: |
+            cartridge-${{ matrix.name }}.zip
+            cartridge-${{ matrix.name }}
 
       - name: Name the Windows exe
         if: matrix.kind == 'windows'

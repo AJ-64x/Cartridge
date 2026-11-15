@@ -46,10 +46,10 @@ is in EmulationStation under *System Settings > Missing BIOS*, or by running `ba
 
 Get the latest version from the [**Releases**](../../releases/latest) page and pick the file for your computer:
 
-| Your computer | Windows | Linux |
-|---|---|---|
-| **Intel / AMD** (most PCs, called x86_64 or "x64") | `cartridge-windows-x86_64.exe` | `cartridge-linux-x86_64.zip` |
-| **ARM** (aarch64 / arm64, e.g. Snapdragon laptops, Raspberry Pi) | `cartridge-windows-aarch64.exe` | `cartridge-linux-aarch64.zip` |
+| Your computer | Windows | Linux (with app-menu installer) | Linux (raw program) |
+|---|---|---|---|
+| **Intel / AMD** (most PCs, called x86_64 or "x64") | `cartridge-windows-x86_64.exe` | `cartridge-linux-x86_64.zip` | `cartridge-linux-x86_64` |
+| **ARM** (aarch64 / arm64, e.g. Snapdragon laptops, Raspberry Pi) | `cartridge-windows-aarch64.exe` | `cartridge-linux-aarch64.zip` | `cartridge-linux-aarch64` |
 
 Not sure? On Windows check *Settings > System > About > System type*. On Linux run `uname -m`
 (`x86_64` = Intel/AMD, `aarch64` = ARM).
@@ -57,7 +57,7 @@ Not sure? On Windows check *Settings > System > About > System type*. On Linux r
 **Windows:** just download the `.exe` and double-click it. No install or unzip needed. (Windows may show a
 SmartScreen warning because the app isn't code-signed: click *More info > Run anyway*.)
 
-**Linux:** unzip the file and run the installer:
+**Linux:** if you want it in your app menu, unzip the zip and run the installer:
 
 ```
 ./install-linux.sh
@@ -66,6 +66,10 @@ SmartScreen warning because the app isn't code-signed: click *More info > Run an
 That puts Cartridge in your app menu with its icon. Search for "Cartridge" (log out and back in once if it
 doesn't appear right away). To remove it: `./install-linux.sh --uninstall`. You can also just run `./cartridge`
 without installing. (If your system says the script isn't executable, run `sh install-linux.sh` instead.)
+
+**Linux, raw program:** download `cartridge-linux-<your type>`, then run `chmod +x cartridge-linux-x86_64`
+(or `-aarch64`) and start it with `./cartridge-linux-x86_64`. Downloads don't keep the executable permission, so
+the `chmod` step is needed.
 
 Releases are built by GitHub Actions. Pushing a tag like `v0.2.1` builds and publishes a new one.
 
