@@ -10,8 +10,18 @@ A small desktop app that installs the BIOS files **you already own** onto a
 ## How it works
 
 ### 1. Connect
-Enter your Batocera's IP address (Batocera: *Main menu > Network Settings*). The defaults are user `root` and
-password `linux`.
+When Cartridge starts it **looks for your Batocera automatically**. It checks your local network for devices
+that share files over SMB (Windows file sharing) and accept SSH, and asks each for its network name (Batocera's
+default is `BATOCERA`). If it finds one, it asks **"Is this your Batocera?"**. Click **Yes, use it** and the IP
+address is filled in for you. Nothing is used until you confirm, and nothing leaves your local network.
+
+<p align="center"><img src="docs/0-found.png" alt="Cartridge found a Batocera and asks if it is yours" width="480"></p>
+
+Then enter the password (the defaults are user `root` and password `linux`). If nothing is found, click **Scan
+again**, or type the IP address yourself (Batocera: *Main menu > Network Settings*).
+
+> Detection scans your computer's own `/24` network (for example `192.168.1.x`). It can't see devices on a
+> different network, behind a guest Wi-Fi, or when Batocera is turned off. Typing the IP always works.
 
 <p align="center"><img src="docs/1-connect.png" alt="Connect step" width="480"></p>
 

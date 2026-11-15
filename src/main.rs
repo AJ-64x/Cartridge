@@ -17,7 +17,8 @@ use std::collections::BTreeMap;
 use md5::{Digest, Md5};
 use ssh2::Session;
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
+use std::sync::{Arc, Mutex};
 use std::path::{Component, Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
@@ -59,6 +60,7 @@ enum Msg {
     Local(Vec<LocalFile>),
     Installed { ok: Vec<String>, failed: Vec<String>, remaining: Vec<Entry> },
     Progress(usize, usize, String),
+    Found(Vec<Device>),
     Err(String),
 }
 
@@ -375,6 +377,130 @@ fn stepper(ui: &mut Ui, cur: usize) {
     });
 }
 
+// ---------- Finding your Batocera on the network ----------
+//
+// Batocera shares its /userdata folder over SMB (Windows file sharing) and has SSH.
+// So we look for devices on the local /24 network that have BOTH port 445 (SMB) and
+// port 22 (SSH) open, and ask each one for its NetBIOS name (UDP 137). Batocera's
+// default name is "BATOCERA". We also try the name batocera.local.
+// Nothing is sent outside your local network, and nothing is used until you confirm.
+
+#[derive(Clone)]
+struct Device {
+    ip: String,
+    name: Option<String>,
+    likely: bool, // the network name starts with "BATOCERA"
+}
+
+fn port_open(ip: Ipv4Addr, port: u16, ms: u64) -> bool {
+    TcpStream::connect_timeout(&SocketAddr::from((ip, port)), Duration::from_millis(ms)).is_ok()
+}
+
+/// Your computer's address on the local network (no data is actually sent).
+fn local_ipv4() -> Option<Ipv4Addr> {
+    for probe in ["8.8.8.8:80", "192.168.1.1:80", "10.0.0.1:80", "172.16.0.1:80"] {
+        if let Ok(s) = UdpSocket::bind("0.0.0.0:0") {
+            if s.connect(probe).is_ok() {
+                if let Ok(SocketAddr::V4(a)) = s.local_addr() {
+                    let ip = *a.ip();
+                    if ip.is_private() {
+                        return Some(ip);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Ask a device for its NetBIOS name (the name Windows shows for it in "Network").
+fn netbios_name(ip: Ipv4Addr) -> Option<String> {
+    let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
+    sock.set_read_timeout(Some(Duration::from_millis(700))).ok()?;
+    // NBSTAT query for the wildcard name "*"
+    let mut q = vec![0x13, 0x37, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0x20, b'C', b'K'];
+    q.extend(std::iter::repeat(b'A').take(30));
+    q.extend_from_slice(&[0, 0x00, 0x21, 0x00, 0x01]);
+    sock.send_to(&q, (ip, 137)).ok()?;
+    let mut buf = [0u8; 1024];
+    let (n, _) = sock.recv_from(&mut buf).ok()?;
+    parse_nbstat(&buf[..n])
+}
+
+/// Read the first name out of a NetBIOS node-status reply.
+fn parse_nbstat(b: &[u8]) -> Option<String> {
+    if b.len() < 14 {
+        return None;
+    }
+    let qd = u16::from_be_bytes([b[4], b[5]]) as usize;
+    let mut pos = 12 + qd * (34 + 4);
+    pos += if b.get(pos)? & 0xC0 == 0xC0 { 2 } else { 34 };
+    pos += 10; // type, class, ttl, data length
+    let count = *b.get(pos)? as usize;
+    pos += 1;
+    if count == 0 {
+        return None;
+    }
+    let name = String::from_utf8_lossy(b.get(pos..pos + 15)?).trim().to_string();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+fn resolve_batocera() -> Option<Ipv4Addr> {
+    for host in ["batocera.local:22", "batocera:22"] {
+        if let Ok(mut addrs) = host.to_socket_addrs() {
+            if let Some(IpAddr::V4(v4)) = addrs.find_map(|a| Some(a.ip()).filter(|i| i.is_ipv4())) {
+                return Some(v4);
+            }
+        }
+    }
+    None
+}
+
+fn discover() -> Vec<Device> {
+    let by_name = std::thread::spawn(resolve_batocera);
+    let mut found: Vec<Device> = vec![];
+    if let Some(me) = local_ipv4() {
+        let o = me.octets();
+        let hosts: Vec<Ipv4Addr> =
+            (1..=254u8).filter(|h| *h != o[3]).map(|h| Ipv4Addr::new(o[0], o[1], o[2], h)).collect();
+        let out = Arc::new(Mutex::new(Vec::new()));
+        let mut handles = vec![];
+        for chunk in hosts.chunks(4) {
+            let (chunk, out) = (chunk.to_vec(), out.clone());
+            handles.push(std::thread::spawn(move || {
+                for ip in chunk {
+                    if !port_open(ip, 445, 400) {
+                        continue; // not sharing files over SMB
+                    }
+                    let ssh = port_open(ip, 22, 400);
+                    let name = netbios_name(ip);
+                    let likely = name.as_deref().map(|n| n.to_uppercase().starts_with("BATOCERA")).unwrap_or(false);
+                    if ssh || likely {
+                        out.lock().unwrap().push(Device { ip: ip.to_string(), name, likely });
+                    }
+                }
+            }));
+        }
+        for h in handles {
+            let _ = h.join();
+        }
+        found = out.lock().unwrap().clone();
+    }
+    if let Ok(Some(ip)) = by_name.join() {
+        let ip = ip.to_string();
+        match found.iter_mut().find(|d| d.ip == ip) {
+            Some(d) => d.likely = true,
+            None => found.push(Device { ip, name: Some("batocera.local".into()), likely: true }),
+        }
+    }
+    found.sort_by_key(|d| !d.likely);
+    found
+}
+
 // ---------- The app ----------
 
 struct App {
@@ -391,6 +517,11 @@ struct App {
     progress: Option<(usize, usize, String)>,
     error: Option<String>,
     note: Option<String>,
+    scanning: bool,
+    scanned: bool,
+    auto_started: bool,
+    devices: Vec<Device>,
+    declined: Vec<String>,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
 }
@@ -412,6 +543,11 @@ impl App {
             progress: None,
             error: None,
             note: None,
+            scanning: false,
+            scanned: false,
+            auto_started: false,
+            devices: vec![],
+            declined: vec![],
             tx,
             rx,
         }
@@ -421,6 +557,8 @@ impl App {
     /// Run with CARTRIDGE_DEMO=connect|pick|install|done
     fn demo(kind: &str) -> Self {
         let mut a = Self::new();
+        a.auto_started = true; // no network scan in demo mode
+        a.scanned = true;
         a.creds.host = "192.168.1.50".into();
         let e = |s: &str, m: bool, f: &str| Entry { system: s.into(), missing: m, md5s: vec!["00".into()], file: f.into() };
         a.entries = vec![
@@ -455,6 +593,10 @@ impl App {
                     a.entries = vec![a.entries[3].clone(), a.entries[5].clone()];
                 }
             }
+            "found" => {
+                a.creds.host = String::new();
+                a.devices = vec![Device { ip: "192.168.1.50".into(), name: Some("BATOCERA".into()), likely: true }];
+            }
             _ => {}
         }
         a
@@ -473,6 +615,12 @@ impl App {
 
     fn poll(&mut self) {
         while let Ok(m) = self.rx.try_recv() {
+            if let Msg::Found(devs) = m {
+                self.devices = devs;
+                self.scanning = false;
+                self.scanned = true;
+                continue;
+            }
             if let Msg::Progress(d, t, n) = m {
                 self.progress = Some((d, t, n));
                 continue;
@@ -495,7 +643,7 @@ impl App {
                     self.installed_once = true;
                 }
                 Msg::Err(e) => self.error = Some(e),
-                Msg::Progress(..) => {}
+                Msg::Progress(..) | Msg::Found(_) => {}
             }
         }
     }
@@ -536,11 +684,90 @@ impl App {
         }
     }
 
+    fn start_discovery(&mut self, ctx: &egui::Context) {
+        self.scanning = true;
+        self.scanned = false;
+        self.devices.clear();
+        self.declined.clear();
+        let (tx, ctx) = (self.tx.clone(), ctx.clone());
+        std::thread::spawn(move || {
+            let _ = tx.send(Msg::Found(discover()));
+            ctx.request_repaint();
+        });
+    }
+
+    fn discovery_ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        let (mut yes, mut no, mut rescan) = (None::<String>, None::<String>, false);
+        if self.scanning {
+            card(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Looking for your Batocera on the network (SMB)...");
+                });
+            });
+        } else if let Some(d) = self.devices.iter().find(|d| !self.declined.contains(&d.ip)).cloned() {
+            egui::Frame::none()
+                .fill(CARD)
+                .stroke(Stroke::new(1.5, ACCENT))
+                .rounding(12.0)
+                .inner_margin(egui::Margin::same(18.0))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.label(RichText::new("Found a device on your network").strong().color(ACCENT));
+                    let title = match &d.name {
+                        Some(n) => format!("{n}   ({})", d.ip),
+                        None => d.ip.clone(),
+                    };
+                    ui.label(RichText::new(title).size(20.0).strong());
+                    ui.label(
+                        RichText::new(if d.likely {
+                            "Its network name looks like a Batocera."
+                        } else {
+                            "It shares files (SMB) and accepts SSH, like a Batocera does."
+                        })
+                        .color(MUTED)
+                        .small(),
+                    );
+                    ui.label("Is this your Batocera?");
+                    ui.horizontal(|ui| {
+                        if primary(ui, true, "Yes, use it") {
+                            yes = Some(d.ip.clone());
+                        }
+                        if ui.button("No").clicked() {
+                            no = Some(d.ip.clone());
+                        }
+                    });
+                });
+        } else if self.scanned {
+            ui.horizontal(|ui| {
+                let msg = if self.devices.is_empty() { "No Batocera found automatically." } else { "No more devices found." };
+                ui.label(RichText::new(msg).color(MUTED));
+                if ui.button("Scan again").clicked() {
+                    rescan = true;
+                }
+            });
+            ui.label(RichText::new("Make sure Batocera is on and on the same network, or type its IP address below.").color(MUTED).small());
+        }
+        if let Some(ip) = yes {
+            self.note = Some(format!("Using {ip}. Enter the password below and connect."));
+            self.creds.host = ip;
+            self.devices.clear();
+            self.scanned = false;
+        }
+        if let Some(ip) = no {
+            self.declined.push(ip);
+        }
+        if rescan {
+            self.start_discovery(ctx);
+        }
+    }
+
     // ----- Step 1 -----
     fn step_connect(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         ui.label(RichText::new("Connect to your Batocera").size(20.0).strong());
         ui.label(RichText::new("Make sure Batocera is on and on the same network as this computer.").color(MUTED));
         ui.add_space(4.0);
+        self.discovery_ui(ui, ctx);
         let mut go = false;
         card(ui, |ui| {
             egui::Grid::new("creds").num_columns(2).spacing([14.0, 12.0]).min_col_width(90.0).show(ui, |ui| {
@@ -745,6 +972,13 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll();
+        if !self.auto_started && self.step == Step::Connect {
+            self.auto_started = true;
+            self.start_discovery(ctx);
+        }
+        if self.scanning {
+            ctx.request_repaint_after(Duration::from_millis(100));
+        }
         // Drag a folder onto the window
         let dropped = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path.clone()));
         if let Some(p) = dropped {
@@ -821,4 +1055,34 @@ fn main() -> Result<(), eframe::Error> {
             })
         }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_missing_list() {
+        let out = "> psx\nMISSING 8dd7d5296a650fac7319bce665a6a53c bios/scph5500.bin\n\
+                   UNTESTED 0123456789abcdef0123456789abcdef or fedcba9876543210fedcba9876543210 bios/two hashes.bin\n\
+                   MISSING - bios/neogeo.zip\n> dc\nOK something else\n";
+        let e = parse_missing(out);
+        assert_eq!(e.len(), 3);
+        assert!(e[0].missing && e[0].system == "psx" && e[0].md5s.len() == 1 && e[0].file == "bios/scph5500.bin");
+        assert!(!e[1].missing && e[1].md5s.len() == 2 && e[1].file == "bios/two hashes.bin");
+        assert!(e[2].md5s.is_empty() && e[2].file == "bios/neogeo.zip");
+    }
+
+    #[test]
+    fn parses_netbios_reply() {
+        let mut r = vec![0x13, 0x37, 0x84, 0x00, 0, 0, 0, 1, 0, 0, 0, 0, 0x20];
+        r.extend_from_slice(b"CK");
+        r.extend(std::iter::repeat(b'A').take(30));
+        r.extend_from_slice(&[0, 0, 0x21, 0, 1, 0, 0, 0, 0, 0, 40]);
+        r.push(1); // one name
+        r.extend_from_slice(b"BATOCERA       "); // 15 bytes
+        r.extend_from_slice(&[0x00, 0x04, 0x00]);
+        assert_eq!(parse_nbstat(&r).as_deref(), Some("BATOCERA"));
+        assert_eq!(parse_nbstat(&[1, 2, 3]), None);
+    }
 }
